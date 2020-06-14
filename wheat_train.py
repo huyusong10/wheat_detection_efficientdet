@@ -18,8 +18,6 @@ from utils.utils import replace_w_sync_bn, CustomDataParallel, get_last_weights,
 
 from wheat_data import get_data_set, collate_fn
 
-torch.cuda.set_device(2)
-
 class Params:
     def __init__(self, file='params.yml'):
         self.params = yaml.safe_load(open(file).read())
@@ -58,11 +56,10 @@ class Params:
 
 #     args = parser.parse_args()
 #     return args
-
-def boolean_string(s):
-    if s not in {'False', 'True'}:
-        raise ValueError('Not a valid boolean string')
-    return s == 'True'
+# def boolean_string(s):
+#     if s not in {'False', 'True'}:
+#         raise ValueError('Not a valid boolean string')
+#     return s == 'True'
 
 class ModelWithLoss(nn.Module):
     def __init__(self, model, debug=False):
@@ -84,7 +81,8 @@ def train(params):
 
     if params.num_gpus == 0:
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-
+    
+    torch.cuda.set_device(params.cuda_id)
     torch.manual_seed(42)
 
     os.makedirs(params.log_path, exist_ok=True)
