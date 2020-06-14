@@ -1,9 +1,9 @@
-project_name: wheat_detection
+﻿project_name: wheat_detection
 
 # 显卡号
-cuda_id: 2
+cuda_id: 0
 
-compound_coef: 2
+compound_coef: 0
 num_workers: 4
 batch_size: 4
 head_only: False
@@ -23,7 +23,7 @@ anchors_scales: '[2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)]'
 anchors_ratios: '[(1.0, 1.0), (1.4, 0.7), (0.7, 1.4)]'
 obj_list: ['wheat spike']
 
-load_weights: '/home/huys/wheat_detection/efficientdet-d2.pth'
+load_weights: '/home/huys/wheat_detection/efficientdet-d0.pth'
 log_path: '/home/huys/wheat_detection/result/logs/tensorboard/'
-saved_path: '/home/huys/wheat_detection/result/model/'
+saved_path: '/home/huys/wheat_detection/result/model_test/'
 debug: False
