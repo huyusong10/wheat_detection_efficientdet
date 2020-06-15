@@ -19,7 +19,7 @@ from utils.utils import replace_w_sync_bn, CustomDataParallel, get_last_weights,
 from wheat_data import get_data_set, collate_fn
 
 class Params:
-    def __init__(self, file='params.yml'):
+    def __init__(self, file=r'./params.yml'):
         self.params = yaml.safe_load(open(file).read())
 
     def __getattr__(self, item):
@@ -318,5 +318,5 @@ def save_checkpoint(model, name):
 
 
 if __name__ == '__main__':
-    params = Params('params.yml')
+    params = Params(r'./params.yml')
     train(params)
