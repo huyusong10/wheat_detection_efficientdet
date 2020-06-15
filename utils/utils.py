@@ -71,6 +71,7 @@ def preprocess(*image_path, max_size=512, mean=(0.406, 0.456, 0.485), std=(0.225
     normalized_imgs = [(img / 255 - mean) / std for img in ori_imgs]
     imgs_meta = [aspectaware_resize_padding(img[..., ::-1], max_size, max_size,
                                             means=None) for img in normalized_imgs]
+    print('imgs_meta: ', imgs_meta[0])
     framed_imgs = [img_meta[0] for img_meta in imgs_meta]
     framed_metas = [img_meta[1:] for img_meta in imgs_meta]
 
@@ -276,11 +277,11 @@ STANDARD_COLORS = [
 #     result=(rgb_color.blue,rgb_color.green,rgb_color.red)
 #     return result
 
-def standard_to_bgr(list_color_name):
-    standard= []
-    for i in range(len(list_color_name)-36): #-36 used to match the len(obj_list)
-        standard.append(from_colorname_to_bgr(list_color_name[i]))
-    return standard
+# def standard_to_bgr(list_color_name):
+#     standard= []
+#     for i in range(len(list_color_name)-36): #-36 used to match the len(obj_list)
+#         standard.append(from_colorname_to_bgr(list_color_name[i]))
+#     return standard
 
 def get_index_label(label, obj_list):
     index = int(obj_list.index(label))

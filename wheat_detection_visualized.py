@@ -9,12 +9,13 @@ import numpy as np
 from efficientdet.utils import BBoxTransform, ClipBoxes
 from utils.utils import preprocess, invert_affine, postprocess
 
-compound_coef = 0
-img_path = '/Volumes/hys portable/Users/hys portable/Downloads portable/global-wheat-detection/train/fe125f8a6.jpg'
+compound_coef = 2
+img_path = '/Volumes/hys portable/Users/hys portable/Downloads portable/global-wheat-detection/test/53f253011.jpg'
+pth_path = '/Users/hys/wheat_detection/d2.pth'
 
 threshold = 0.3
 iou_threshold = 0.2
-input_size = 512
+input_size = 768
 
 
 obj_list = ['wheat spike']
@@ -28,7 +29,7 @@ model = EfficientDetBackbone(compound_coef=compound_coef, num_classes=len(obj_li
                              scales=[2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)])
 
 
-model.load_state_dict(torch.load('/Users/hys/Downloads/final_stage.pth', map_location=torch.device('cpu')))
+model.load_state_dict(torch.load(pth_path, map_location=torch.device('cpu')))
 model.requires_grad_(False)
 model.eval()
 
@@ -47,6 +48,7 @@ out = invert_affine(framed_metas, out)
 
 
 plt.figure(figsize=(8,8))
+plt.axis('off')
 for i in range(len(ori_imgs)):
     if len(out[i]['rois']) == 0:
         continue
