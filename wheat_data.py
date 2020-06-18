@@ -39,7 +39,7 @@ class WheatDataset(Dataset):
 
         sample = {'img': image, 'annot': boxes}
         if self.transforms:
-            sample = self.transforms(sample)        
+            sample = self.transforms(sample)   
 
         return sample
 
@@ -174,9 +174,9 @@ def get_data_set(compound_coef=0, DIR_INPUT=input_dir):
     valid_ids = image_ids[-600:]
 
     train_df = ori_df[ori_df['image_id'].isin(train_ids)]
-    print(train_df.shape)
+    # print(train_df.shape)
     valid_df = ori_df[ori_df['image_id'].isin(valid_ids)]
-    print(valid_df.shape)
+    # print(valid_df.shape)
 
     train_dataset = WheatDataset(train_df, DIR_TRAIN, get_train_transform(compound_coef))
     valid_dataset = WheatDataset(valid_df, DIR_TRAIN, get_valid_transform(compound_coef))
