@@ -12,8 +12,8 @@ from utils.utils import postprocess
 from utils.eval_utils import calculate_image_precision, calculate_precision
 from wheat_data import get_data_set, collate_fn
 
-torch.cuda.set_device(3)
-use_cuda = False
+torch.cuda.set_device(0)
+use_cuda = True
 compound_coef = 0
 pth_path = '/home/huys/wheat_detection/result/model_test/efficientdet-d0_23_16632.pth'
 
@@ -49,10 +49,13 @@ if use_cuda:
 
 eval_result = []
 for data in tqdm(val_generator):
-    imgs = torch.stack([img for img in data['img']], 0)
-    batch_gts = data['annot'].int()
     if use_cuda:
-        imgs.cuda()
+        imgs = torch.stack([img.cuda() for img in data['img']], 0)
+    else:
+        imgs = torch.stack([img for img in data['img']], 0)
+    batch_gts = data['annot'].int()
+    # if use_cuda:
+    #     imgs.cuda()
 
     with torch.no_grad():
         features, regression, classification, anchors = model(imgs)
