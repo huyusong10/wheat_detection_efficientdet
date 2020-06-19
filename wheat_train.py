@@ -203,6 +203,7 @@ def train(params):
     num_iter_per_epoch = len(training_generator)
     model_with_loss.train()
     use_precision = params.train_with_precision
+    precision = 0.0
 
     try:
         for epoch in range(params.num_epochs):
@@ -381,8 +382,6 @@ def train(params):
                 if use_precision:
                     precision = np.mean(precision_ls)
                 loss = cls_loss + reg_loss
-
-
 
                 print(
                     '测试集结果：轮次: {}/{}. 分类loss: {:1.5f}. 回归loss: {:1.5f}. 总loss: {:1.5f}. 精确度: {:1.5f}'
