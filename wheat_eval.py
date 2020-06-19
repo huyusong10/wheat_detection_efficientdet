@@ -15,7 +15,7 @@ from wheat_data import get_data_set, collate_fn
 torch.cuda.set_device(0)
 use_cuda = True
 compound_coef = 0
-pth_path = '/home/huys/wheat_detection/result/model_test/efficientdet-d0_39_6920.pth'
+pth_path = '/home/huys/wheat_detection/result/model_without_precision_2/savedByLoss-d0_6_1211.pth'
 
 threshold = 0.5
 iou_threshold = 0.2
@@ -43,6 +43,8 @@ else:
     model.load_state_dict(torch.load(pth_path, map_location=torch.device('cpu')))
 model.requires_grad_(False)
 model.eval()
+if use_cuda:
+    model.cuda()
 
 eval_result = []
 for data in tqdm(val_generator):
@@ -58,10 +60,16 @@ for data in tqdm(val_generator):
         regressBoxes = BBoxTransform()
         clipBoxes = ClipBoxes()
 
+        # use NMS
         out = postprocess(imgs,
                             anchors, regression, classification,
                             regressBoxes, clipBoxes,
                             threshold, iou_threshold)
+        # use WBF
+        # out = postprocess(imgs,
+        #                     anchors, regression, classification,
+        #                     regressBoxes, clipBoxes,
+        #                     use_WBF=True, WBF_thr=0.5, WBF_skip_thr=0.6, input_size=512)
 
     batch_result = []
     for i in range(batch_size):
