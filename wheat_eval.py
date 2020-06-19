@@ -15,13 +15,13 @@ from wheat_data import get_data_set, collate_fn
 torch.cuda.set_device(0)
 use_cuda = True
 compound_coef = 0
-pth_path = '/home/huys/wheat_detection/result/model_test/efficientdet-d0_23_16632.pth'
+pth_path = '/home/huys/wheat_detection/result/model_test/efficientdet-d0_39_6920.pth'
 
 threshold = 0.5
 iou_threshold = 0.2
 obj_list = ['wheat spike']
 eval_thresholds = (0.5,)
-batch_size = 4
+batch_size = 16
 
 val_params = {'batch_size': batch_size,
             'shuffle': False,
@@ -43,9 +43,6 @@ else:
     model.load_state_dict(torch.load(pth_path, map_location=torch.device('cpu')))
 model.requires_grad_(False)
 model.eval()
-if use_cuda:
-    model = model.cuda()
-
 
 eval_result = []
 for data in tqdm(val_generator):
@@ -54,8 +51,6 @@ for data in tqdm(val_generator):
     else:
         imgs = torch.stack([img for img in data['img']], 0)
     batch_gts = data['annot'].int()
-    # if use_cuda:
-    #     imgs.cuda()
 
     with torch.no_grad():
         features, regression, classification, anchors = model(imgs)

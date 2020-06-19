@@ -4,17 +4,20 @@
 cuda_id: 0
 
 compound_coef: 0
-num_workers: 4
-batch_size: 4
+num_workers: 16
+batch_size: 16
 head_only: False
 lr: 0.0001
 optim: 'adamw'
-num_epochs: 30
+num_epochs: 120
 val_interval: 1
 save_interval: 2000
 es_min_delta: 0.0
 es_patience: 0
 num_gpus: 1
+
+# 每个轮次都会计算mAP，测试的时候慢不少，额外再吃1G左右显存
+train_with_precision: False
 
 mean: [0.485, 0.456, 0.406]
 std: [0.229, 0.224, 0.225]
@@ -25,5 +28,10 @@ obj_list: ['wheat spike']
 
 load_weights: '/home/huys/wheat_detection/efficientdet-d0.pth'
 log_path: '/home/huys/wheat_detection/result/logs/tensorboard/'
-saved_path: '/home/huys/wheat_detection/result/model_test/'
+saved_path: '/home/huys/wheat_detection/result/model_without_precision/'
 debug: False
+
+# 启用train_with_precision之后，下面参数才有意义
+eval_thresholds : '(0.5,)'
+threshold : 0.5
+iou_threshold : 0.2
