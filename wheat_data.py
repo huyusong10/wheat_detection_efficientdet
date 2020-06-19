@@ -172,6 +172,8 @@ def get_data_set(compound_coef=0, DIR_INPUT=input_dir):
     image_ids = ori_df['image_id'].unique()
     train_ids = image_ids[:-600]
     valid_ids = image_ids[-600:]
+    # train_ids = image_ids[:]
+    # valid_ids = image_ids[-60:]
 
     train_df = ori_df[ori_df['image_id'].isin(train_ids)]
     # print(train_df.shape)

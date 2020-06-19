@@ -390,7 +390,8 @@ def train(params):
                 writer.add_scalars('总Loss', {'测试集': loss}, step)
                 writer.add_scalars('回归loss', {'测试集': reg_loss}, step)
                 writer.add_scalars('分类loss', {'测试集': cls_loss}, step)
-                writer.add_scalars('精确度', {'测试集': precision}, step)
+                if use_precision:
+                    writer.add_scalars('精确度', {'测试集': precision}, step)
 
                 loss_save = False
                 if loss + params.es_min_delta < best_loss:
@@ -404,10 +405,10 @@ def train(params):
                     )
                     loss_save = True
 
-                if use_precision:
-                    if precision > best_precision and not loss_save:
-                        best_precision = precision
-                        print(f'最佳精确度更新为{best_precision}，若本次没有通过loss保存模型，则保存为savedByPrecision-d{params.compound_coef}_{epoch}_{step}.pth')
+                if precision > best_precision and use_precision:
+                    best_precision = precision
+                    print(f'最佳精确度更新为{best_precision}，若本次没有通过loss保存模型，则保存为savedByPrecision-d{params.compound_coef}_{epoch}_{step}.pth')
+                    if not loss_save:
                         save_checkpoint(
                             model_with_loss,
                             f'savedByPrecision-d{params.compound_coef}_{epoch}_{step}.pth'
