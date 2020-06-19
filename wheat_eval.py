@@ -43,9 +43,6 @@ else:
     model.load_state_dict(torch.load(pth_path, map_location=torch.device('cpu')))
 model.requires_grad_(False)
 model.eval()
-if use_cuda:
-    model = model.cuda()
-
 
 eval_result = []
 for data in tqdm(val_generator):
