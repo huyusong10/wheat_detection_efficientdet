@@ -56,7 +56,6 @@ def get_train_transform(compound_coef=0):
 def get_valid_transform(compound_coef=0):
     return transforms.Compose([
         Normalizer(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        Augmenter(),
         Resizer(input_sizes[compound_coef])
     ])
 

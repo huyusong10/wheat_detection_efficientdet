@@ -387,7 +387,7 @@ def train(params):
                     '测试集结果：轮次: {}/{}. 分类loss: {:1.5f}. 回归loss: {:1.5f}. 总loss: {:1.5f}. 精确度: {:1.5f}'
                     .format(epoch, params.num_epochs, cls_loss, reg_loss,
                             loss, precision))
-                writer.add_scalars('总Loss', {'测试集': loss}, step)
+                writer.add_scalars('总loss', {'测试集': loss}, step)
                 writer.add_scalars('回归loss', {'测试集': reg_loss}, step)
                 writer.add_scalars('分类loss', {'测试集': cls_loss}, step)
                 if use_precision:

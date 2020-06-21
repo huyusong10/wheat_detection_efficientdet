@@ -137,7 +137,7 @@ def calculate_precision(gts, preds, threshold = 0.5, form = 'pascal_voc', ious=N
 
 
 @jit(nopython=True)
-def calculate_image_precision(gts, preds, thresholds = (0.5, ), form = 'pascal_voc') -> float:
+def calculate_image_precision(gts, preds, thresholds = (0.5, 0.55, 0.6, 0.65, 0.7, 0.75), form = 'pascal_voc') -> float:
     """Calculates image precision.
 
     Args:
