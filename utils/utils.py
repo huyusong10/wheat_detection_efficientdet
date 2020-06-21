@@ -90,7 +90,7 @@ def preprocess_video(*frame_from_video, max_size=512, mean=(0.406, 0.456, 0.485)
     return ori_imgs, framed_imgs, framed_metas
 
 
-def postprocess(x, anchors, regression, classification, regressBoxes, clipBoxes, threshold=0.5, iou_threshold=0.2, use_WBF=False, WBF_thr=0.5, WBF_skip_thr=0.75, input_size=512):
+def postprocess(x, anchors, regression, classification, regressBoxes, clipBoxes, threshold=0.5, iou_threshold=0.2, use_WBF=False, WBF_thr=0.5, WBF_iou_thr=0.55, input_size=512):
     transformed_anchors = regressBoxes(anchors, regression)
     transformed_anchors = clipBoxes(transformed_anchors, x)
     scores = torch.max(classification, dim=2, keepdim=True)[0]
@@ -133,8 +133,8 @@ def postprocess(x, anchors, regression, classification, regressBoxes, clipBoxes,
                 scores_per[:, 0].unsqueeze(0).cpu().numpy(),
                 classes_.unsqueeze(0).cpu().numpy(),
                 weights=None,
-                iou_thr=WBF_thr,
-                skip_box_thr=WBF_skip_thr)
+                iou_thr=WBF_iou_thr,
+                skip_box_thr=WBF_thr)
             if boxes_WBF.shape[0] != 0:
                 out.append({
                     'rois':(boxes_WBF*(input_size-1)).astype(int),

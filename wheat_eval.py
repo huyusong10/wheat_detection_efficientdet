@@ -54,7 +54,7 @@ def eval_data(dataset, dataset_params, model, threshold=0.5, iou_threshold=0.2):
             # out = postprocess(imgs,
             #                     anchors, regression, classification,
             #                     regressBoxes, clipBoxes,
-            #                     use_WBF=True, WBF_thr=0.5, WBF_skip_thr=0.0, input_size=512)
+            #                     use_WBF=True, WBF_thr=0.5, WBF_iou_thr=0.55, input_size=512)
 
         batch_result = []
         for i in range(batch_size):

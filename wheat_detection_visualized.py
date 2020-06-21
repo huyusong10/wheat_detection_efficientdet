@@ -42,7 +42,7 @@ with torch.no_grad():
     out = postprocess(x,
                       anchors, regression, classification,
                       regressBoxes, clipBoxes,
-                      use_WBF=True, WBF_thr=0.5, WBF_skip_thr=0.0, input_size=512)
+                      use_WBF=True, WBF_thr=0.5, WBF_iou_thr=0.55, input_size=512)
 
 out = invert_affine(framed_metas, out)
 
