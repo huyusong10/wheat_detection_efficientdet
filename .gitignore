@@ -134,3 +134,5 @@ weights/
 pth/
 test/
 *.pth
+test.py
+.DS_Store
