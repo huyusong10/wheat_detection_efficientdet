@@ -95,4 +95,4 @@ if __name__ == '__mian__':
         model = model.cuda()
 
     test_df_pseudo = predict_test(DIR_TEST, model)
-    generate_train(test_df_pseudo)
+    final_train_csv = generate_train(test_df_pseudo)
