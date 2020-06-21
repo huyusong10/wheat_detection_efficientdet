@@ -2,6 +2,8 @@ import os
 import torch
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
+
 from backbone import EfficientDetBackbone
 from efficientdet.utils import BBoxTransform, ClipBoxes
 from utils.utils import preprocess, invert_affine, postprocess
@@ -9,10 +11,11 @@ from utils.utils import preprocess, invert_affine, postprocess
 
 def predict_test(imgs_dir, model):
     testdf_psuedo = []
-    for img_dir in os.listdir(imgs_dir):
-        if not img_dir.endswith('.jpg'):
+    for img in tqdm(os.listdir(imgs_dir)):
+        if not img.endswith('.jpg'):
             continue
-        full_dir = os.path.join(imgs_dir, img_dir)
+        full_dir = os.path.join(imgs_dir, img)
+        print(full_dir)
         ori_imgs, framed_imgs, framed_metas = preprocess(full_dir, max_size=input_size)
         if use_cuda:
             x = torch.stack([torch.from_numpy(fi).cuda() for fi in framed_imgs], 0)
@@ -33,7 +36,7 @@ def predict_test(imgs_dir, model):
         for i in range(len(ori_imgs)):
             if len(out[i]['rois']) == 0:
                 result = {
-                    'image_id': img_dir.split('.')[0],
+                    'image_id': img.split('.')[0],
                     'PredictionString': ''
                 }
                 testdf_psuedo.append(result)
@@ -48,7 +51,7 @@ def predict_test(imgs_dir, model):
                 if j[0] < score_threshold:
                     continue
                 result = {
-                    'image_id': img_dir.split('.')[0],
+                    'image_id': img.split('.')[0],
                     'width': 1024,
                     'height': 1024,
                     'bbox': "[{0:.1f} {1:.1f} {2:.1f} {3:.1f}]".format(j[1][0], j[1][1], j[1][2], j[1][3]),
@@ -56,22 +59,28 @@ def predict_test(imgs_dir, model):
                 }
                 testdf_psuedo.append(result)
 
-        test_df_pseudo = pd.DataFrame(testdf_psuedo,
+    test_df_pseudo = pd.DataFrame(testdf_psuedo,
                                       columns=['image_id', 'width', 'height', 'bbox', 'source'])
-        return test_df_pseudo
+    return test_df_pseudo
 
 
-def generate_train(test_df_pseudo):
-    train_df = pd.read_csv('../input/global-wheat-detection/train.csv')
+def generate_train(test_df_pseudo, traincsv):
+    train_df = pd.read_csv(traincsv)
     frames = [train_df, test_df_pseudo]
     train_df = pd.concat(frames)
 
     return train_df
 
 
-if __name__ == '__mian__':
-    FILE_PREMODEL = r'../input/wheatdetection/wheat_detection/pth/final_stage.pth'
-    DIR_TEST = r'../input/wheatdetection/wheat_detection/test'
+if __name__ == '__main__':
+    # FILE_PREMODEL = r'../input/wheatdetection/wheat_detection/pth/final_stage.pth'
+    # DIR_TEST = r'../input/wheatdetection/wheat_detection/test'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+
+    FILE_PREMODEL = r'new.pth'
+    FILE_TRAINCSV = r'/home/zhucc/global-wheat-detection/train.csv'
+    DIR_TEST = r'/home/zhucc/global-wheat-detection/test'
+
     compound_coef = 0
 
     threshold = 0.3
@@ -93,6 +102,12 @@ if __name__ == '__mian__':
 
     if use_cuda:
         model = model.cuda()
-
+    print('predicting...')
+    # pseudo label
     test_df_pseudo = predict_test(DIR_TEST, model)
-    final_train_csv = generate_train(test_df_pseudo)
+    test_df_pseudo.to_csv('pseudo.csv', index=False)
+
+    # merge
+    final_train_csv = generate_train(test_df_pseudo, FILE_TRAINCSV)
+    final_train_csv.to_csv('final.csv', index=False)
+
