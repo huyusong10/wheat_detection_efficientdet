@@ -69,7 +69,7 @@ for data in tqdm(val_generator):
         # out = postprocess(imgs,
         #                     anchors, regression, classification,
         #                     regressBoxes, clipBoxes,
-        #                     use_WBF=True, WBF_thr=0.5, WBF_skip_thr=0.6, input_size=512)
+        #                     use_WBF=True, WBF_thr=0.5, WBF_skip_thr=0.0, input_size=512)
 
     batch_result = []
     for i in range(batch_size):
