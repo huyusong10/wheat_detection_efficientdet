@@ -12,22 +12,23 @@ from utils.utils import postprocess
 from utils.eval_utils import calculate_image_precision, calculate_precision
 from wheat_data import get_data_set, collate_fn
 
-torch.cuda.set_device(0)
-use_cuda = True
+torch.cuda.set_device(3)
+use_cuda = False
 compound_coef = 0
-pth_path = '/home/huys/wheat_detection/result/model_without_precision_2/savedByLoss-d0_6_1211.pth'
+pth_path = '/home/huys/wheat_detection/result/model_without_precision_2/savedByLoss-d0_5_1260.pth'
+# pth_path = '/home/huys/wheat_detection/result/model_test/final_stage.pth'
 
 threshold = 0.5
 iou_threshold = 0.2
 obj_list = ['wheat spike']
-eval_thresholds = (0.5,)
+eval_thresholds = (0.5, 0.55, 0.6, 0.65, 0.7, 0.75)
 batch_size = 16
 
 val_params = {'batch_size': batch_size,
             'shuffle': False,
             'drop_last': True,
             'collate_fn': collate_fn,
-            'num_workers': 4}
+            'num_workers': 16}
 
 _, val_set = get_data_set(compound_coef)
 val_generator = DataLoader(val_set, **val_params)
@@ -61,15 +62,15 @@ for data in tqdm(val_generator):
         clipBoxes = ClipBoxes()
 
         # use NMS
-        # out = postprocess(imgs,
-        #                     anchors, regression, classification,
-        #                     regressBoxes, clipBoxes,
-        #                     threshold, iou_threshold)
-        # use WBF
         out = postprocess(imgs,
                             anchors, regression, classification,
                             regressBoxes, clipBoxes,
-                            use_WBF=True, WBF_thr=0.5, WBF_skip_thr=0.0, input_size=512)
+                            threshold, iou_threshold)
+        # use WBF
+        # out = postprocess(imgs,
+        #                     anchors, regression, classification,
+        #                     regressBoxes, clipBoxes,
+        #                     use_WBF=True, WBF_thr=0.5, WBF_skip_thr=0.0, input_size=512)
 
     batch_result = []
     for i in range(batch_size):

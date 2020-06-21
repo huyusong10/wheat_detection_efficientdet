@@ -32,6 +32,6 @@ saved_path: '/home/huys/wheat_detection/result/model_without_precision_2/'
 debug: False
 
 # 启用train_with_precision之后，下面参数才有意义
-eval_thresholds : '(0.5,)'
+eval_thresholds : '(0.5, 0.55, 0.6, 0.65, 0.7, 0.75)'
 threshold : 0.5
 iou_threshold : 0.2
