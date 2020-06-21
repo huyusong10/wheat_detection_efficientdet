@@ -13,7 +13,7 @@ from typing import Union
 import uuid
 
 from utils.sync_batchnorm import SynchronizedBatchNorm2d
-from ensemble_boxes import weighted_boxes_fusion
+from utils.ensemble_boxes import weighted_boxes_fusion
 
 from torch.nn.init import _calculate_fan_in_and_fan_out, _no_grad_normal_
 import math
