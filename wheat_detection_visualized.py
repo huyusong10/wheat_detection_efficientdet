@@ -13,8 +13,8 @@ compound_coef = 0
 img_path = '/Volumes/hys portable/Users/hys portable/Downloads portable/global-wheat-detection/test/53f253011.jpg'
 pth_path = '/Users/hys/Downloads/final_stage.pth'
 
-threshold = 0.3
-iou_threshold = 0.2
+threshold = 0.5
+iou_threshold = 0.25
 input_size = 512
 
 

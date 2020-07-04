@@ -18,9 +18,9 @@ from efficientdet.utils import BBoxTransform, ClipBoxes
 from utils.eval_utils import calculate_image_precision, calculate_precision
 from utils.utils import postprocess
 from utils.utils import replace_w_sync_bn, CustomDataParallel, get_last_weights, init_weights
+from utils.sync_batchnorm import patch_replication_callback
 
 from wheat_data import get_data_set, collate_fn
-
 
 class Params:
     def __init__(self, file=r'./params.yml'):
@@ -94,7 +94,8 @@ def train(params):
     if params.num_gpus == 0:
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    torch.cuda.set_device(params.cuda_id)
+    if params.num_gpus ==1:
+        torch.cuda.set_device(params.cuda_id)
     torch.manual_seed(42)
 
     os.makedirs(params.log_path, exist_ok=True)
@@ -173,27 +174,39 @@ def train(params):
     else:
         use_sync_bn = False
 
+
     writer = SummaryWriter(
         params.log_path +
         f'/{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}/')
 
-    # warp the model with loss function, to reduce the memory usage on gpu0 and speedup
     model_with_loss = ModelWithLoss(model, debug=params.debug)
 
     if params.num_gpus > 0:
         model_with_loss = model_with_loss.cuda()
+        if params.num_gpus > 1:
+            model_with_loss = CustomDataParallel(model_with_loss, params.num_gpus)
+            if use_sync_bn:
+                patch_replication_callback(model_with_loss)
 
     if params.optim == 'adamw':
         optimizer = torch.optim.AdamW(model_with_loss.parameters(), params.lr)
-    else:
+    elif params.optim == 'adamax':
+        optimizer = torch.optim.Adamax(model_with_loss.parameters(), params.lr)
+    elif params.optim == 'SGD':
         optimizer = torch.optim.SGD(model_with_loss.parameters(),
                                     params.lr,
                                     momentum=0.9,
                                     nesterov=True)
+    else:
+        print(f'无{params.lr}优化器')
+        raise Exception
 
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
-                                                           patience=3,
-                                                           verbose=True)
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+    #                                                        factor=0.5,
+    #                                                        patience=10,
+    #                                                        cooldown=50,
+    #                                                        min_lr=1e-6)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 50, 3e-6)
 
     epoch = 0
     best_loss = 1e5
@@ -244,6 +257,8 @@ def train(params):
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(model_with_loss.parameters(), 0.1)
                     optimizer.step()
+                    scheduler.step()
+                    # scheduler.step(loss)
 
                     epoch_loss.append(float(loss))
 
@@ -256,7 +271,6 @@ def train(params):
                     writer.add_scalars('回归loss', {'训练集': reg_loss}, step)
                     writer.add_scalars('分类loss', {'训练集': cls_loss}, step)
 
-                    # log learning_rate
                     current_lr = optimizer.param_groups[0]['lr']
                     writer.add_scalar('学习率', current_lr, step)
 
@@ -274,48 +288,13 @@ def train(params):
                     print(e)
                     sys.exit()
 
-            scheduler.step(np.mean(epoch_loss))
+            # scheduler.step(np.mean(epoch_loss))
 
             if epoch % params.val_interval == 0:
                 loss_regression_ls = []
                 loss_classification_ls = []
                 precision_ls = []
                 model_with_loss.eval()
-
-                # only calculate valid set loss
-                # for iters, data in enumerate(val_generator):
-
-                #     with torch.no_grad():
-                #         imgs = data['img']
-                #         annot = data['annot']
-
-                #         if params.num_gpus == 1:
-                #             imgs = imgs.cuda()
-                #             annot = annot.cuda()
-
-                #         try:
-                #             cls_loss, reg_loss = model_with_loss(
-                #                 imgs, annot, obj_list=params.obj_list)
-                #             cls_loss = cls_loss.mean()
-                #             reg_loss = reg_loss.mean()
-
-                #             loss = cls_loss + reg_loss
-
-                #             if loss == 0 or not torch.isfinite(loss):
-                #                 continue
-                #         except Exception as e:
-                #             print(e)
-                #             print('cls_loss: ', cls_loss)
-                #             print('reg_loss: ', reg_loss)
-
-                #         loss_classification_ls.append(cls_loss.item())
-                #         loss_regression_ls.append(reg_loss.item())
-
-                # if not loss_classification_ls or not loss_regression_ls:
-                #     continue
-                # cls_loss = np.mean(loss_classification_ls)
-                # reg_loss = np.mean(loss_regression_ls)
-                # loss = cls_loss + reg_loss
 
                 # calculate valid set loss and precision(use mAP)
                 for iters, data in enumerate(val_generator):
@@ -355,6 +334,8 @@ def train(params):
                                                 anchors, regression, classification,
                                                 regressBoxes, clipBoxes,
                                                 params.threshold, params.iou_threshold)
+                                if len(out[i]['rois']) == 0:
+                                    print(out)
                                 batch_precision = []
                                 for i in range(params.batch_size):
                                     preds = out[i]['rois'].astype(int)

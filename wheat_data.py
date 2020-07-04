@@ -10,6 +10,8 @@ from torchvision import transforms
 import torch
 import torchvision
 
+from sklearn.model_selection import StratifiedKFold
+
 input_sizes = [512,640,768,896,1024]
 input_dir = '/home/huys/wheat_detection'
 
@@ -150,8 +152,24 @@ class Normalizer(object):
 
         return {'img': ((image.astype(np.float32) - self.mean) / self.std), 'annot': annots}
 
+def split_data(df, n=5):
+    skf = StratifiedKFold(n_splits=n, shuffle=True, random_state=47)
 
-def get_data_set(compound_coef=0, DIR_INPUT=input_dir):
+    df_folds = df[['image_id']].copy()
+    df_folds.loc[:, 'bbox_count'] = 1
+    df_folds = df_folds.groupby('image_id').count()
+    df_folds.loc[:, 'source'] = df[['image_id', 'source']].groupby('image_id').min()['source']
+    df_folds.loc[:, 'stratify_group'] = np.char.add(
+        df_folds['source'].values.astype(str),
+        df_folds['bbox_count'].apply(lambda x: f'_{x // 15}').values.astype(str)
+    )
+    df_folds.loc[:, 'fold'] = 0
+    for fold_number, (train_index, val_index) in enumerate(skf.split(X=df_folds.index, y=df_folds['stratify_group'])):
+        df_folds.loc[df_folds.iloc[val_index].index, 'fold'] = fold_number
+
+    return df_folds
+
+def get_data_set(compound_coef=0, DIR_INPUT=input_dir, fold_number=3):
     ori_df = pd.read_csv(f'{DIR_INPUT}/train.csv')
     DIR_TRAIN = f'{DIR_INPUT}/train'
 
@@ -167,17 +185,28 @@ def get_data_set(compound_coef=0, DIR_INPUT=input_dir):
     ori_df['w'] = ori_df['w'].astype(np.float)
     ori_df['h'] = ori_df['h'].astype(np.float)
 
+    ori_df['area'] = ori_df['w'] * ori_df['h']
 
-    image_ids = ori_df['image_id'].unique()
-    train_ids = image_ids[:-600]
-    valid_ids = image_ids[-600:]
-    # train_ids = image_ids[:]
-    # valid_ids = image_ids[-60:]
+    area_list = ori_df['area'].values.tolist()
+    area_list_copy = area_list.copy()
+    area_list_copy.sort(reverse=True)
+
+    for i in range(10):
+        index = area_list.index(area_list_copy[i])
+        ori_df.drop([index], inplace=True)
+
+
+    # image_ids = ori_df['image_id'].unique()
+    # train_ids = image_ids[:-600]
+    # valid_ids = image_ids[-600:]
+
+    split_df = split_data(ori_df, n=5)
+
+    valid_ids = list(split_df[split_df['fold'] == fold_number].index)
+    train_ids = list(split_df[split_df['fold'] != fold_number].index)
 
     train_df = ori_df[ori_df['image_id'].isin(train_ids)]
-    # print(train_df.shape)
     valid_df = ori_df[ori_df['image_id'].isin(valid_ids)]
-    # print(valid_df.shape)
 
     train_dataset = WheatDataset(train_df, DIR_TRAIN, get_train_transform(compound_coef))
     valid_dataset = WheatDataset(valid_df, DIR_TRAIN, get_valid_transform(compound_coef))

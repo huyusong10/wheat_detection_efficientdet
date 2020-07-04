@@ -14,6 +14,7 @@ import uuid
 
 from utils.sync_batchnorm import SynchronizedBatchNorm2d
 from utils.ensemble_boxes import weighted_boxes_fusion
+from efficientdet.utils import BBoxTransform, ClipBoxes
 
 from torch.nn.init import _calculate_fan_in_and_fan_out, _no_grad_normal_
 import math
@@ -148,6 +149,55 @@ def postprocess(x, anchors, regression, classification, regressBoxes, clipBoxes,
                     'scores': np.array(()),
                 })
 
+    return out
+
+def postprocess_on_iou_threshold(batch_size, classification, transformed_anchors, scores, scores_over_thresh, iou_threshold, use_WBF=False, threshold=0.5, input_size=512):
+    out = []
+    for i in range(batch_size):
+        classification_per = classification[i, scores_over_thresh[i, :], ...].permute(1, 0)
+        transformed_anchors_per = transformed_anchors[i, scores_over_thresh[i, :], ...]
+        scores_per = scores[i, scores_over_thresh[i, :], ...]
+        if classification_per.numel() == 0:
+            continue
+        scores_, classes_ = classification_per.max(dim=0)
+
+        if not use_WBF:
+            anchors_nms_idx = batched_nms(transformed_anchors_per, scores_per[:, 0], classes_, iou_threshold=iou_threshold)
+            if anchors_nms_idx.shape[0] != 0:
+                boxes_ = transformed_anchors_per[anchors_nms_idx, :]
+                scores_ = scores_[anchors_nms_idx]
+                classes_ = classes_[anchors_nms_idx]
+                out.append({
+                    'rois': boxes_.cpu().numpy(),
+                    'class_ids': classes_.cpu().numpy(),
+                    'scores': scores_.cpu().numpy(),
+                })
+            else:
+                out.append({
+                        'rois': np.array(()),
+                        'class_ids': np.array(()),
+                        'scores': np.array(()),
+                    })
+        else:
+            boxes_WBF, scores_WBF, labels_WBF = weighted_boxes_fusion(
+                transformed_anchors_per.unsqueeze(0).cpu().numpy() / (input_size-1),
+                scores_per[:, 0].unsqueeze(0).cpu().numpy(),
+                classes_.unsqueeze(0).cpu().numpy(),
+                weights=None,
+                iou_thr=iou_threshold,
+                skip_box_thr=threshold)
+            if boxes_WBF.shape[0] != 0:
+                out.append({
+                    'rois':(boxes_WBF*(input_size-1)).astype(int),
+                    'class_ids':labels_WBF.astype(int),
+                    'scores':scores_WBF
+                })
+            else:
+                out.append({
+                    'rois': np.array(()),
+                    'class_ids': np.array(()),
+                    'scores': np.array(()),
+                })
     return out
 
 

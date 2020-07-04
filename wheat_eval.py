@@ -91,9 +91,7 @@ if __name__ == '__main__':
     if use_cuda:
         model.cuda()
 
-    result = []
-    for i in range(3):
-        result.append(eval_data(val_set, val_params, model))
+    result = eval_data(val_set, val_params, model)
     print(result)
 
 
