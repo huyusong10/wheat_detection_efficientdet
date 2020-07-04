@@ -9,10 +9,10 @@ compound_coef: 4
 num_workers: 4
 batch_size: 4
 head_only: False
-lr: 0.0003
+lr: 0.0001
 # 可选方案 adamw，adamax，SGD
 optim: 'adamw'
-num_epochs: 40
+num_epochs: 30
 val_interval: 1
 save_interval: 500
 es_min_delta: 0.0

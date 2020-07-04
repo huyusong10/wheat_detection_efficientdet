@@ -206,7 +206,8 @@ def train(params):
     #                                                        patience=10,
     #                                                        cooldown=50,
     #                                                        min_lr=1e-6)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 50, 3e-6)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 50, 3e-6)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 600, gamma=0.1)
 
     epoch = 0
     best_loss = 1e5
