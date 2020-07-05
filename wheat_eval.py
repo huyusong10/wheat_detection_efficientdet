@@ -12,27 +12,27 @@ from utils.utils import postprocess
 from utils.eval_utils import calculate_image_precision, calculate_precision
 from wheat_data import get_data_set, collate_fn
 
-torch.cuda.set_device(3)
-use_cuda = False
-compound_coef = 0
-pth_path = '/home/huys/wheat_detection/result/model_without_precision_2/savedByLoss-d0_5_1260.pth'
+torch.cuda.set_device(0)
+use_cuda = True
+compound_coef = 4
+pth_path = '/home/huys/wheat_detection/result/model_d4_1e-3_1200_0.5/savedByLoss-d4_3_2700.pth'
 # pth_path = '/home/huys/wheat_detection/result/model_test/final_stage.pth'
 
 threshold = 0.5
-iou_threshold = 0.2
+iou_threshold = 0.25
 obj_list = ['wheat spike']
-batch_size = 16
+batch_size = 4
 
 val_params = {'batch_size': batch_size,
             'shuffle': False,
             'drop_last': True,
             'collate_fn': collate_fn,
-            'num_workers': 16}
+            'num_workers': 4}
 
-def eval_data(dataset, dataset_params, model, threshold=0.5, iou_threshold=0.2):
+def eval_data(dataset, dataset_params, model, threshold, iou_threshold):
     val_generator = DataLoader(dataset, **dataset_params)
     eval_result = []
-    for data in tqdm(val_generator):
+    for i, data in enumerate(tqdm(val_generator)):
         if use_cuda:
             imgs = torch.stack([img.cuda() for img in data['img']], 0)
         else:
@@ -59,12 +59,14 @@ def eval_data(dataset, dataset_params, model, threshold=0.5, iou_threshold=0.2):
         batch_result = []
         for i in range(batch_size):
             preds = out[i]['rois'].astype(int)
+            if preds.size == 0:
+                batch_result.append(0)
+                continue
             gts = batch_gts[i]
             gts = gts[gts[::,4] > -1].numpy()
-            image_precision = calculate_image_precision(preds,
-                                                        gts,
-                                                        thresholds=(0.5, 0.55, 0.6, 0.65, 0.7, 0.75),
-                                                        form='pascal_voc')
+            image_precision = calculate_image_precision(gts,
+                                                        preds,
+                                                        thresholds=(0.5, 0.55, 0.6, 0.65, 0.7, 0.75),)
             batch_result.append(image_precision)
 
         mean_precision = np.mean(batch_result)
@@ -91,7 +93,7 @@ if __name__ == '__main__':
     if use_cuda:
         model.cuda()
 
-    result = eval_data(val_set, val_params, model)
+    result = eval_data(val_set, val_params, model, threshold, iou_threshold)
     print(result)
 
 

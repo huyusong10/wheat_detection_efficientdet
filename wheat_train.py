@@ -177,7 +177,7 @@ def train(params):
 
     writer = SummaryWriter(
         params.log_path +
-        f'/{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}/')
+        f'/{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}'+f'_d{params.compound_coef}_{params.lr}/')
 
     model_with_loss = ModelWithLoss(model, debug=params.debug)
 
@@ -198,7 +198,7 @@ def train(params):
                                     momentum=0.9,
                                     nesterov=True)
     else:
-        print(f'无{params.lr}优化器')
+        print(f'无{params.optim}优化器')
         raise Exception
 
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
@@ -207,7 +207,7 @@ def train(params):
     #                                                        cooldown=50,
     #                                                        min_lr=1e-6)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 50, 3e-6)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 600, gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1200, gamma=0.5)
 
     epoch = 0
     best_loss = 1e5
@@ -322,9 +322,6 @@ def train(params):
                                 continue
                         except Exception as e:
                             print(e)
-                            print('cls_loss: ', cls_loss)
-                            print('reg_loss: ', reg_loss)
-
                         if use_precision:
                             try:
                                 features, regression, classification, anchors = model(imgs)
@@ -335,17 +332,17 @@ def train(params):
                                                 anchors, regression, classification,
                                                 regressBoxes, clipBoxes,
                                                 params.threshold, params.iou_threshold)
-                                if len(out[i]['rois']) == 0:
-                                    print(out)
                                 batch_precision = []
                                 for i in range(params.batch_size):
                                     preds = out[i]['rois'].astype(int)
+                                    if preds.size == 0:
+                                        batch_precision.append(0)
+                                        continue
                                     gts = batch_gts[i]
                                     gts = gts[gts[::,4] > -1].numpy()
-                                    image_precision = calculate_image_precision(preds,
-                                                                                gts,
-                                                                                thresholds=eval(params.eval_thresholds),
-                                                                                form='pascal_voc')
+                                    image_precision = calculate_image_precision(gts,
+                                                                                preds,
+                                                                                thresholds=eval(params.eval_thresholds),)
                                     batch_precision.append(image_precision)
                                 mean_precision = np.mean(batch_precision)
                                 precision_ls.append(mean_precision)

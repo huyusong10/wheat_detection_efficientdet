@@ -139,3 +139,4 @@ test.py
 .DS_Store
 params_auto_adjust/
 which_is_best_WBF.py
+params.yml

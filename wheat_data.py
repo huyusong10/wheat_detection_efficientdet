@@ -169,7 +169,7 @@ def split_data(df, n=5):
 
     return df_folds
 
-def get_data_set(compound_coef=0, DIR_INPUT=input_dir, fold_number=3):
+def get_data_set(compound_coef, DIR_INPUT=input_dir, fold_number=3):
     ori_df = pd.read_csv(f'{DIR_INPUT}/train.csv')
     DIR_TRAIN = f'{DIR_INPUT}/train'
 

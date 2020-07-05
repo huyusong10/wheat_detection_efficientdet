@@ -11,7 +11,7 @@ from typing import List, Union, Tuple
 
 
 @jit(nopython=True)
-def calculate_iou(gt, pr, form='pascal_voc') -> float:
+def calculate_iou(gt, pr) -> float:
     """Calculates the Intersection over Union.
 
     Args:
@@ -23,15 +23,6 @@ def calculate_iou(gt, pr, form='pascal_voc') -> float:
     Returns:
         (float) Intersection over union (0.0 <= iou <= 1.0)
     """
-    if form == 'coco':
-        gt = gt.copy()
-        pr = pr.copy()
-
-        gt[2] = gt[0] + gt[2]
-        gt[3] = gt[1] + gt[3]
-        pr[2] = pr[0] + pr[2]
-        pr[3] = pr[1] + pr[3]
-
     # Calculate overlap area
     dx = min(gt[2], pr[2]) - max(gt[0], pr[0]) + 1
 
@@ -52,7 +43,7 @@ def calculate_iou(gt, pr, form='pascal_voc') -> float:
     return overlap_area / union_area
 
 @jit(nopython=True)
-def find_best_match(gts, pred, pred_idx, threshold = 0.5, form = 'pascal_voc', ious=None) -> int:
+def find_best_match(gts, pred, pred_idx, threshold = 0.5, ious=None) -> int:
     """Returns the index of the 'best match' between the
     ground-truth boxes and the prediction. The 'best match'
     is the highest IoU. (0.0 IoUs are ignored).
@@ -80,7 +71,7 @@ def find_best_match(gts, pred, pred_idx, threshold = 0.5, form = 'pascal_voc', i
         iou = -1 if ious is None else ious[gt_idx][pred_idx]
 
         if iou < 0:
-            iou = calculate_iou(gts[gt_idx], pred, form=form)
+            iou = calculate_iou(gts[gt_idx], pred)
             
             if ious is not None:
                 ious[gt_idx][pred_idx] = iou
@@ -95,7 +86,7 @@ def find_best_match(gts, pred, pred_idx, threshold = 0.5, form = 'pascal_voc', i
     return best_match_idx
 
 @jit(nopython=True)
-def calculate_precision(gts, preds, threshold = 0.5, form = 'pascal_voc', ious=None) -> float:
+def calculate_precision(gts, preds, threshold, ious) -> float:
     """Calculates precision for GT - prediction pairs at one threshold.
 
     Args:
@@ -117,7 +108,7 @@ def calculate_precision(gts, preds, threshold = 0.5, form = 'pascal_voc', ious=N
     for pred_idx in range(n):
 
         best_match_gt_idx = find_best_match(gts, preds[pred_idx], pred_idx,
-                                            threshold=threshold, form=form, ious=ious)
+                                            threshold=threshold, ious=ious)
 
         if best_match_gt_idx >= 0:
             # True positive: The predicted box matches a gt box with an IoU above the threshold.
@@ -132,12 +123,11 @@ def calculate_precision(gts, preds, threshold = 0.5, form = 'pascal_voc', ious=N
 
     # False negative: indicates a gt box had no associated predicted box.
     fn = (gts.sum(axis=1) > 0).sum()
-
     return tp / (tp + fp + fn)
 
 
 @jit(nopython=True)
-def calculate_image_precision(gts, preds, thresholds = (0.5, 0.55, 0.6, 0.65, 0.7, 0.75), form = 'pascal_voc') -> float:
+def calculate_image_precision(gts, preds, thresholds = (0.5, 0.55, 0.6, 0.65, 0.7, 0.75)) -> float:
     """Calculates image precision.
 
     Args:
@@ -158,7 +148,7 @@ def calculate_image_precision(gts, preds, thresholds = (0.5, 0.55, 0.6, 0.65, 0.
 
     for threshold in thresholds:
         precision_at_threshold = calculate_precision(gts.copy(), preds, threshold=threshold,
-                                                     form=form, ious=ious)
+                                                     ious=ious)
         image_precision += precision_at_threshold / n_threshold
 
     return image_precision

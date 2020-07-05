@@ -94,18 +94,18 @@ if __name__ == '__main__':
                 scores = torch.max(classification, dim=2, keepdim=True)[0]
                 scores_over_thresh = (scores > threshold)[:, :, 0]
                 out = postprocess_on_iou_threshold(batch_size, classification, anchors, scores, scores_over_thresh, iou_threshold)
-                if len(out) == 0:
-                    print('out空')
                 batch_result = []
                 for x in range(len(out)):
                     preds = out[x]['rois'].astype(int)
+                    if preds.size == 0:
+                        batch_result.append(0)
+                        continue
                     gts = gts_on_batch[x]
                     gts = gts[gts[::,4] > -1].numpy()
 
-                    image_precision = calculate_image_precision(preds,
-                                                                gts,
-                                                                thresholds=(0.5, 0.55, 0.6, 0.65, 0.7, 0.75),
-                                                                form='pascal_voc')
+                    image_precision = calculate_image_precision(gts,
+                                                                preds,
+                                                                thresholds=(0.5, 0.55, 0.6, 0.65, 0.7, 0.75),)
                     batch_result.append(image_precision)
                 mean_precision = np.mean(batch_result)
                 eval_result.append(mean_precision)

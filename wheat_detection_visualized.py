@@ -9,13 +9,13 @@ import numpy as np
 from efficientdet.utils import BBoxTransform, ClipBoxes
 from utils.utils import preprocess, invert_affine, postprocess
 
-compound_coef = 0
-img_path = '/Volumes/hys portable/Users/hys portable/Downloads portable/global-wheat-detection/test/53f253011.jpg'
-pth_path = '/Users/hys/Downloads/final_stage.pth'
+compound_coef = 4
+img_path = '/home/huys/wheat_detection/test/2fd875eaa.jpg'
+pth_path = '/home/huys/wheat_detection/result/model_d4_3e-4_1200_0.7/savedByLoss-d4_2_2025.pth'
 
 threshold = 0.5
 iou_threshold = 0.25
-input_size = 512
+input_size = 1024
 
 
 obj_list = ['wheat spike']
@@ -42,7 +42,7 @@ with torch.no_grad():
     out = postprocess(x,
                       anchors, regression, classification,
                       regressBoxes, clipBoxes,
-                      use_WBF=True, WBF_thr=0.5, WBF_iou_thr=0.55, input_size=512)
+                      use_WBF=False, WBF_thr=threshold, WBF_iou_thr=iou_threshold, input_size=1024)
 
 out = invert_affine(framed_metas, out)
 
