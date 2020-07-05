@@ -17,7 +17,7 @@ from efficientdet.loss import FocalLoss
 from efficientdet.utils import BBoxTransform, ClipBoxes
 from utils.eval_utils import calculate_image_precision, calculate_precision
 from utils.utils import postprocess
-from utils.utils import replace_w_sync_bn, CustomDataParallel, CustomPrecisionParallel, get_last_weights, init_weights
+from utils.utils import replace_w_sync_bn, CustomDataParallel, get_last_weights, init_weights
 from utils.sync_batchnorm import patch_replication_callback
 
 from wheat_data import get_data_set, collate_fn
@@ -75,7 +75,7 @@ class ModelWithLoss(nn.Module):
         self.debug = debug
 
     def forward(self, imgs, annotations, obj_list=None):
-        _, regression, classification, anchors = self.model(imgs)
+        features, regression, classification, anchors = self.model(imgs)
         if self.debug:
             cls_loss, reg_loss = self.criterion(classification,
                                                 regression,
@@ -86,7 +86,8 @@ class ModelWithLoss(nn.Module):
         else:
             cls_loss, reg_loss = self.criterion(classification, regression,
                                                 anchors, annotations)
-        return cls_loss, reg_loss
+        data = {'features':features, 'regression':regression, 'classification':classification, 'anchors':anchors}
+        return cls_loss, reg_loss, data
 
 
 def train(params):
@@ -179,22 +180,21 @@ def train(params):
         params.log_path +
         f'/{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}'+f'_d{params.compound_coef}_{params.lr}/')
 
-    model_with_loss = ModelWithLoss(model, debug=params.debug)
+    model = ModelWithLoss(model, debug=params.debug)
 
     if params.num_gpus > 0:
-        model_with_loss = model_with_loss.cuda()
+        model = model.cuda()
         if params.num_gpus > 1:
-            model_with_loss = CustomDataParallel(model_with_loss, params.num_gpus)
-            model = CustomPrecisionParallel(model, params.num_gpus)
+            model = CustomDataParallel(model, params.num_gpus)
             if use_sync_bn:
-                patch_replication_callback(model_with_loss)
+                patch_replication_callback(model)
 
     if params.optim == 'adamw':
-        optimizer = torch.optim.AdamW(model_with_loss.parameters(), params.lr)
+        optimizer = torch.optim.AdamW(model.parameters(), params.lr)
     elif params.optim == 'adamax':
-        optimizer = torch.optim.Adamax(model_with_loss.parameters(), params.lr)
+        optimizer = torch.optim.Adamax(model.parameters(), params.lr)
     elif params.optim == 'SGD':
-        optimizer = torch.optim.SGD(model_with_loss.parameters(),
+        optimizer = torch.optim.SGD(model.parameters(),
                                     params.lr,
                                     momentum=0.9,
                                     nesterov=True)
@@ -215,7 +215,7 @@ def train(params):
     best_epoch = 0
     step = max(0, last_step)
     num_iter_per_epoch = len(training_generator)
-    model_with_loss.train()
+    model.train()
     use_precision = params.train_with_precision
     precision = 0.0
 
@@ -244,7 +244,7 @@ def train(params):
                         annot = annot.cuda()
 
                     optimizer.zero_grad()
-                    cls_loss, reg_loss = model_with_loss(imgs,
+                    cls_loss, reg_loss, _= model(imgs,
                                                annot,
                                                obj_list=params.obj_list)
                     cls_loss = cls_loss.mean()
@@ -256,7 +256,7 @@ def train(params):
                         continue
 
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(model_with_loss.parameters(), 0.1)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
                     optimizer.step()
                     # scheduler.step()
                     # scheduler.step(loss)
@@ -279,14 +279,13 @@ def train(params):
 
                     if step % params.save_interval == 0 and step > 0:
                         save_checkpoint(
-                            model_with_loss,
+                            model,
                             f'savedByCheckpoint-d{params.compound_coef}_{epoch}_{step}.pth'
                         )
                         print(f'检查点，保存模型savedByCheckpoint-d{params.compound_coef}_{epoch}_{step}.pth')
 
                 except Exception as e:
                     print('[Error]', traceback.format_exc())
-                    print(e)
                     sys.exit()
 
             scheduler.step(np.mean(epoch_loss))
@@ -295,7 +294,7 @@ def train(params):
                 loss_regression_ls = []
                 loss_classification_ls = []
                 precision_ls = []
-                model_with_loss.eval()
+                model.eval()
 
                 # calculate valid set loss and precision(use mAP)
                 for iters, data in enumerate(val_generator):
@@ -303,14 +302,13 @@ def train(params):
                     with torch.no_grad():
                         imgs = data['img']
                         annot = data['annot']
-                        if use_precision:
-                            batch_gts = data['annot'].int()
+                        batch_gts = data['annot'].int()
 
                         if params.num_gpus == 1:
                             imgs = imgs.cuda()
                             annot = annot.cuda()
 
-                        cls_loss, reg_loss = model_with_loss(
+                        cls_loss, reg_loss, data= model(
                             imgs, annot, obj_list=params.obj_list)
                         cls_loss = cls_loss.mean()
                         reg_loss = reg_loss.mean()
@@ -320,12 +318,11 @@ def train(params):
                             continue
 
                         if use_precision:
-                            features, regression, classification, anchors = model(imgs)
                             regressBoxes = BBoxTransform()
                             clipBoxes = ClipBoxes()
 
                             out = postprocess(imgs,
-                                            anchors, regression, classification,
+                                            data['anchors'], data['regression'], data['classification'],
                                             regressBoxes, clipBoxes,
                                             params.threshold, params.iou_threshold)
                             batch_precision = []
@@ -342,12 +339,8 @@ def train(params):
                                 batch_precision.append(image_precision)
                             mean_precision = np.mean(batch_precision)
                             precision_ls.append(mean_precision)
-
-
                         loss_classification_ls.append(cls_loss.item())
                         loss_regression_ls.append(reg_loss.item())
-
-                        
 
                 if not loss_classification_ls or not loss_regression_ls:
                     continue
@@ -374,7 +367,7 @@ def train(params):
                     best_epoch = epoch
 
                     save_checkpoint(
-                        model_with_loss,
+                        model,
                         f'savedByLoss-d{params.compound_coef}_{epoch}_{step}.pth'
                     )
                     loss_save = True
@@ -384,11 +377,11 @@ def train(params):
                     print(f'最佳精确度更新为{best_precision}，若本次没有通过loss保存模型，则保存为savedByPrecision-d{params.compound_coef}_{epoch}_{step}.pth')
                     if not loss_save:
                         save_checkpoint(
-                            model_with_loss,
+                            model,
                             f'savedByPrecision-d{params.compound_coef}_{epoch}_{step}.pth'
                         )
 
-                model_with_loss.train()
+                model.train()
 
                 # Early stopping
                 if epoch - best_epoch > params.es_patience > 0:
@@ -398,7 +391,7 @@ def train(params):
                     break
     except KeyboardInterrupt:
         save_checkpoint(
-            model_with_loss, f'saveByInterrupt-d{params.compound_coef}_{epoch}_{step}.pth')
+            model, f'saveByInterrupt-d{params.compound_coef}_{epoch}_{step}.pth')
         writer.close()
     finally:
         print('本次训练信息总结：\n最佳loss为{:.5f}，最佳轮次为{}，最佳精确度为{:.5f}'.format(best_loss,best_epoch,best_precision))
