@@ -278,6 +278,23 @@ class CustomDataParallel(nn.DataParallel):
                 for device_idx in range(len(devices))], \
                [kwargs] * len(devices)
 
+class CustomPrecisionParallel(nn.DataParallel):
+    def __init__(self, module, num_gpus):
+        super().__init__(module)
+        self.num_gpus = num_gpus
+
+    def scatter(self, inputs, kwargs, device_ids):
+
+        devices = ['cuda:' + str(x) for x in range(self.num_gpus)]
+        splits = inputs[0].shape[0] // self.num_gpus
+
+        if splits == 0:
+            raise Exception('Batchsize must be greater than num_gpus.')
+
+        return [(inputs[0][splits * device_idx: splits * (device_idx + 1)].to(f'cuda:{device_idx}', non_blocking=True),)
+                for device_idx in range(len(devices))], \
+               [kwargs] * len(devices)
+
 
 def get_last_weights(weights_path):
     weights_path = glob(weights_path + f'/*.pth')

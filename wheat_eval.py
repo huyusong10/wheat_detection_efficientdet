@@ -15,8 +15,7 @@ from wheat_data import get_data_set, collate_fn
 torch.cuda.set_device(0)
 use_cuda = True
 compound_coef = 4
-pth_path = '/home/huys/wheat_detection/result/model_d4_1e-3_1200_0.5/savedByLoss-d4_3_2700.pth'
-# pth_path = '/home/huys/wheat_detection/result/model_test/final_stage.pth'
+pth_path = '/home/huys/wheat_detection/result/model_d4_7e-4_1200_0.1/savedByLoss-d4_1_1350.pth'
 
 threshold = 0.5
 iou_threshold = 0.25

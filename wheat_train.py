@@ -17,7 +17,7 @@ from efficientdet.loss import FocalLoss
 from efficientdet.utils import BBoxTransform, ClipBoxes
 from utils.eval_utils import calculate_image_precision, calculate_precision
 from utils.utils import postprocess
-from utils.utils import replace_w_sync_bn, CustomDataParallel, get_last_weights, init_weights
+from utils.utils import replace_w_sync_bn, CustomDataParallel, CustomPrecisionParallel, get_last_weights, init_weights
 from utils.sync_batchnorm import patch_replication_callback
 
 from wheat_data import get_data_set, collate_fn
@@ -185,6 +185,7 @@ def train(params):
         model_with_loss = model_with_loss.cuda()
         if params.num_gpus > 1:
             model_with_loss = CustomDataParallel(model_with_loss, params.num_gpus)
+            model = CustomPrecisionParallel(model, params.num_gpus)
             if use_sync_bn:
                 patch_replication_callback(model_with_loss)
 
@@ -201,13 +202,12 @@ def train(params):
         print(f'无{params.optim}优化器')
         raise Exception
 
-    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
-    #                                                        factor=0.5,
-    #                                                        patience=10,
-    #                                                        cooldown=50,
-    #                                                        min_lr=1e-6)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                           factor=0.1,
+                                                           patience=1,
+                                                           min_lr=1e-6)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 50, 3e-6)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1200, gamma=0.5)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5000, gamma=0.1)
 
     epoch = 0
     best_loss = 1e5
@@ -258,7 +258,7 @@ def train(params):
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(model_with_loss.parameters(), 0.1)
                     optimizer.step()
-                    scheduler.step()
+                    # scheduler.step()
                     # scheduler.step(loss)
 
                     epoch_loss.append(float(loss))
@@ -289,7 +289,7 @@ def train(params):
                     print(e)
                     sys.exit()
 
-            # scheduler.step(np.mean(epoch_loss))
+            scheduler.step(np.mean(epoch_loss))
 
             if epoch % params.val_interval == 0:
                 loss_regression_ls = []
@@ -310,44 +310,39 @@ def train(params):
                             imgs = imgs.cuda()
                             annot = annot.cuda()
 
-                        try:
-                            cls_loss, reg_loss = model_with_loss(
-                                imgs, annot, obj_list=params.obj_list)
-                            cls_loss = cls_loss.mean()
-                            reg_loss = reg_loss.mean()
+                        cls_loss, reg_loss = model_with_loss(
+                            imgs, annot, obj_list=params.obj_list)
+                        cls_loss = cls_loss.mean()
+                        reg_loss = reg_loss.mean()
+                        loss = cls_loss + reg_loss
 
-                            loss = cls_loss + reg_loss
+                        if loss == 0 or not torch.isfinite(loss):
+                            continue
 
-                            if loss == 0 or not torch.isfinite(loss):
-                                continue
-                        except Exception as e:
-                            print(e)
                         if use_precision:
-                            try:
-                                features, regression, classification, anchors = model(imgs)
-                                regressBoxes = BBoxTransform()
-                                clipBoxes = ClipBoxes()
+                            features, regression, classification, anchors = model(imgs)
+                            regressBoxes = BBoxTransform()
+                            clipBoxes = ClipBoxes()
 
-                                out = postprocess(imgs,
-                                                anchors, regression, classification,
-                                                regressBoxes, clipBoxes,
-                                                params.threshold, params.iou_threshold)
-                                batch_precision = []
-                                for i in range(params.batch_size):
-                                    preds = out[i]['rois'].astype(int)
-                                    if preds.size == 0:
-                                        batch_precision.append(0)
-                                        continue
-                                    gts = batch_gts[i]
-                                    gts = gts[gts[::,4] > -1].numpy()
-                                    image_precision = calculate_image_precision(gts,
-                                                                                preds,
-                                                                                thresholds=eval(params.eval_thresholds),)
-                                    batch_precision.append(image_precision)
-                                mean_precision = np.mean(batch_precision)
-                                precision_ls.append(mean_precision)
-                            except Exception as e:
-                                print(e)
+                            out = postprocess(imgs,
+                                            anchors, regression, classification,
+                                            regressBoxes, clipBoxes,
+                                            params.threshold, params.iou_threshold)
+                            batch_precision = []
+                            for i in range(params.batch_size):
+                                preds = out[i]['rois'].astype(int)
+                                if preds.size == 0:
+                                    batch_precision.append(0)
+                                    continue
+                                gts = batch_gts[i]
+                                gts = gts[gts[::,4] > -1].numpy()
+                                image_precision = calculate_image_precision(gts,
+                                                                            preds,
+                                                                            thresholds=eval(params.eval_thresholds),)
+                                batch_precision.append(image_precision)
+                            mean_precision = np.mean(batch_precision)
+                            precision_ls.append(mean_precision)
+
 
                         loss_classification_ls.append(cls_loss.item())
                         loss_regression_ls.append(reg_loss.item())

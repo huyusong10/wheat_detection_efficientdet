@@ -169,7 +169,7 @@ def split_data(df, n=5):
 
     return df_folds
 
-def get_data_set(compound_coef, DIR_INPUT=input_dir, fold_number=3):
+def get_data_set(compound_coef, DIR_INPUT=input_dir, fold_number=0):
     ori_df = pd.read_csv(f'{DIR_INPUT}/train.csv')
     DIR_TRAIN = f'{DIR_INPUT}/train'
 
@@ -195,13 +195,13 @@ def get_data_set(compound_coef, DIR_INPUT=input_dir, fold_number=3):
         index = area_list.index(area_list_copy[i])
         ori_df.drop([index], inplace=True)
 
+    # 后600张做验证集
+    image_ids = ori_df['image_id'].unique()
+    train_ids = image_ids[:-600]
+    valid_ids = image_ids[-600:]
 
-    # image_ids = ori_df['image_id'].unique()
-    # train_ids = image_ids[:-600]
-    # valid_ids = image_ids[-600:]
-
+    # stratified kflod划分数据集，fold_number定义哪一个做验证集
     split_df = split_data(ori_df, n=5)
-
     valid_ids = list(split_df[split_df['fold'] == fold_number].index)
     train_ids = list(split_df[split_df['fold'] != fold_number].index)
 
