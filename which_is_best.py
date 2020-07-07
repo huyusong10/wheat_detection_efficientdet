@@ -17,18 +17,18 @@ from utils.eval_utils import calculate_image_precision, calculate_precision
 
 torch.cuda.set_device(3)
 use_cuda = False
-compound_coef = 0
-pth_path = '/home/huys/wheat_detection/result/model_kfold_3_step_cos/savedByLoss-d0_9_1680.pth'
+compound_coef = 4
+pth_path = '/home/huys/wheat_detection/result/model_d4_1e-3_ReduceLROnPlateau/savedByPrecision-d4_23_16128.pth'
 
 obj_list = ['wheat spike']
 eval_thresholds = (0.5, 0.55, 0.6, 0.65, 0.7, 0.75)
-batch_size = 16
+batch_size = 32
 
 val_params = {'batch_size': batch_size,
             'shuffle': False,
             'drop_last': True,
             'collate_fn': collate_fn,
-            'num_workers': 16}
+            'num_workers': 32}
 
 if __name__ == '__main__':
 
@@ -80,12 +80,15 @@ if __name__ == '__main__':
 
     all_result = []
 
-    for i in tqdm(range(30, 61)):
+    max_i = 60
+    max_j = 40
+
+    for i in tqdm(range(30, max_i+1)):
         threshold = i/100
         thresh_result = []
-        for j in tqdm(range(15, 41)):
+        for j in tqdm(range(15, max_j+1)):
             iou_threshold = j/100
-            eval_result = []
+            step_result = []
             for iters in range(len(val_generator)):
           
                 gts_on_batch = gts_ls[iters]
@@ -94,25 +97,21 @@ if __name__ == '__main__':
                 scores = torch.max(classification, dim=2, keepdim=True)[0]
                 scores_over_thresh = (scores > threshold)[:, :, 0]
                 out = postprocess_on_iou_threshold(batch_size, classification, anchors, scores, scores_over_thresh, iou_threshold)
-                batch_result = []
                 for x in range(len(out)):
                     preds = out[x]['rois'].astype(int)
                     if preds.size == 0:
-                        batch_result.append(0)
+                        step_result.append(0)
                         continue
                     gts = gts_on_batch[x]
                     gts = gts[gts[::,4] > -1].numpy()
 
                     image_precision = calculate_image_precision(gts,
-                                                                preds,
-                                                                thresholds=(0.5, 0.55, 0.6, 0.65, 0.7, 0.75),)
-                    batch_result.append(image_precision)
-                mean_precision = np.mean(batch_result)
-                eval_result.append(mean_precision)
-            
-            precision_over_step = np.mean(eval_result)
+                                                                preds)
+                    step_result.append(image_precision)
+
+            precision_over_step = np.mean(step_result)
             thresh_result.append(precision_over_step)
-            if j == 35:
+            if j == max_j:
                 all_result.append(thresh_result)
 
             writer.add_scalar('precision_over_step', precision_over_step, i*31+j)
@@ -120,15 +119,15 @@ if __name__ == '__main__':
                 best_precision = precision_over_step
                 best_thresh = threshold
                 best_iou_thresh = iou_threshold
-                print(f'最佳精确度更新为{best_precision}，此时threshold为{threshold}，iou_threshold为{iou_threshold}')
+                print(f'最佳精确度更新为{best_precision}，此时threshold为{best_thresh}，iou_threshold为{best_iou_thresh}')
         
         precision_over_thresh = np.mean(thresh_result)
         writer.add_scalar('precision_over_thresh', precision_over_thresh, i)
-    print(f'此次测试最佳精确度为{best_precision}，此时threshold为{threshold}，iou_threshold为{iou_threshold}')
+    print(f'此次测试最佳精确度为{best_precision}，此时threshold为{best_thresh}，iou_threshold为{best_iou_thresh}')
 
     precision_over_iou_thresh = np.mean(all_result, axis=0)
-    with open('tmp.pkl', 'wb') as f:
-        pickle.dump(all_result, f)
+    # with open('tmp.pkl', 'wb') as f:
+    #     pickle.dump(all_result, f)
 
     for i in range(len(precision_over_iou_thresh)):
         writer.add_scalar('precision_over_iou_thresh', precision_over_iou_thresh[i], i+15)

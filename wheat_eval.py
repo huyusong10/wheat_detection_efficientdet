@@ -13,20 +13,20 @@ from utils.eval_utils import calculate_image_precision, calculate_precision
 from wheat_data import get_data_set, collate_fn
 
 torch.cuda.set_device(0)
-use_cuda = True
+use_cuda = False
 compound_coef = 4
-pth_path = '/home/huys/wheat_detection/result/model_d4_7e-4_1200_0.1/savedByLoss-d4_1_1350.pth'
+pth_path = '/home/huys/wheat_detection/result/model_d4_3e-4_ReduceLROnPlateau/savedByLoss-d4_0_672.pth'
 
 threshold = 0.5
 iou_threshold = 0.25
 obj_list = ['wheat spike']
-batch_size = 4
+batch_size = 32
 
 val_params = {'batch_size': batch_size,
             'shuffle': False,
             'drop_last': True,
             'collate_fn': collate_fn,
-            'num_workers': 4}
+            'num_workers': batch_size}
 
 def eval_data(dataset, dataset_params, model, threshold, iou_threshold):
     val_generator = DataLoader(dataset, **dataset_params)
@@ -53,7 +53,7 @@ def eval_data(dataset, dataset_params, model, threshold, iou_threshold):
             # out = postprocess(imgs,
             #                     anchors, regression, classification,
             #                     regressBoxes, clipBoxes,
-            #                     use_WBF=True, WBF_thr=0.5, WBF_iou_thr=0.55, input_size=512)
+            #                     use_WBF=True, WBF_thr=threshold, WBF_iou_thr=iou_threshold, input_size=512)
 
         batch_result = []
         for i in range(batch_size):
@@ -64,16 +64,13 @@ def eval_data(dataset, dataset_params, model, threshold, iou_threshold):
             gts = batch_gts[i]
             gts = gts[gts[::,4] > -1].numpy()
             image_precision = calculate_image_precision(gts,
-                                                        preds,
-                                                        thresholds=(0.5, 0.55, 0.6, 0.65, 0.7, 0.75),)
+                                                        preds)
             batch_result.append(image_precision)
 
         mean_precision = np.mean(batch_result)
-        # print(mean_precision)
         eval_result.append(mean_precision)
 
     valid_precision = np.mean(eval_result)
-    # print('last:', valid_precision)
     return valid_precision
 
 if __name__ == '__main__':
