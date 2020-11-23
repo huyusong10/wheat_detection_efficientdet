@@ -131,10 +131,13 @@ dmypy.json
 .idea/
 weights/
 
-# 定制
+# custom
 pth/
+outs/
 test/
-*.pth
+old/
+pretrained/
+
 test.py
 .DS_Store
 params_auto_adjust/

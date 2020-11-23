@@ -1,6 +1,7 @@
 # Author: Zylo117
 
 import os
+import random
 
 import cv2
 import numpy as np
@@ -9,12 +10,12 @@ from glob import glob
 from torch import nn
 from torchvision.ops import nms
 from torchvision.ops.boxes import batched_nms
+import torch.backends.cudnn as cudnn
 from typing import Union
 import uuid
 
 from utils.sync_batchnorm import SynchronizedBatchNorm2d
 from utils.ensemble_boxes import weighted_boxes_fusion
-from efficientdet.utils import BBoxTransform, ClipBoxes
 
 from torch.nn.init import _calculate_fan_in_and_fan_out, _no_grad_normal_
 import math
@@ -278,23 +279,6 @@ class CustomDataParallel(nn.DataParallel):
                 for device_idx in range(len(devices))], \
                [kwargs] * len(devices)
 
-# class CustomPrecisionParallel(nn.DataParallel):
-#     def __init__(self, module, num_gpus):
-#         super().__init__(module)
-#         self.num_gpus = num_gpus
-
-#     def scatter(self, inputs, kwargs, device_ids):
-
-#         devices = ['cuda:' + str(x) for x in range(self.num_gpus)]
-#         splits = inputs[0].shape[0] // self.num_gpus
-
-#         if splits == 0:
-#             raise Exception('Batchsize must be greater than num_gpus.')
-
-#         return [(inputs[0][splits * device_idx: splits * (device_idx + 1)].to(f'cuda:{device_idx}', non_blocking=True),)
-#                 for device_idx in range(len(devices))], \
-#                [kwargs] * len(devices)
-
 
 def get_last_weights(weights_path):
     weights_path = glob(weights_path + f'/*.pth')
@@ -387,3 +371,49 @@ def plot_one_box(img, coord, label=None, score=None, color=None, line_thickness=
         c2 = c1[0] + t_size[0]+s_size[0]+15, c1[1] - t_size[1] -3
         cv2.rectangle(img, c1, c2 , color, -1)  # filled
         cv2.putText(img, '{}: {:.0%}'.format(label, score), (c1[0],c1[1] - 2), 0, float(tl) / 3, [0, 0, 0], thickness=tf, lineType=cv2.FONT_HERSHEY_SIMPLEX)
+
+
+def check_file(file):
+    if os.path.isfile(file):
+        return file
+    else:
+        files = glob(os.path.join('**', file), recursive=True)
+        assert len(files), f'{file} not found!'
+        return files[0] 
+
+def select_device(device='', batch_size=None):
+    cpu_request = device.lower() == 'cpu'
+    if device and not cpu_request:  # if device requested other than 'cpu'
+        os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable
+        assert torch.cuda.is_available(), 'CUDA unavailable, invalid device %s requested' % device  # check availablity
+
+    cuda = False if cpu_request else torch.cuda.is_available()
+    if cuda:
+        c = 1024 ** 2  # bytes to MB
+        ng = torch.cuda.device_count()
+        if ng > 1 and batch_size:  # check that batch_size is compatible with device_count
+            assert batch_size % ng == 0, 'batch-size %g not multiple of GPU count %g' % (batch_size, ng)
+        x = [torch.cuda.get_device_properties(i) for i in range(ng)]
+        s = 'Using CUDA '
+        for i in range(0, ng):
+            if i == 1:
+                s = ' ' * len(s)
+            print("%sdevice%g _CudaDeviceProperties(name='%s', total_memory=%dMB)" %
+                  (s, i, x[i].name, x[i].total_memory / c))
+    else:
+        print('Using CPU')
+
+    print('')
+    return torch.device('cuda:0' if cuda else 'cpu')
+
+def init_seeds(seed=0):
+    torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    # Speed-reproducibility tradeoff https://pytorch.org/docs/stable/notes/randomness.html
+    if seed == 0:  # slower, more reproducible
+        cudnn.deterministic = True
+        cudnn.benchmark = False
+    else:  # faster, less reproducible
+        cudnn.deterministic = False
+        cudnn.benchmark = True

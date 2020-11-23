@@ -1,16 +1,11 @@
-import pandas as pd
 import numpy as np
 import numba
-import re
-import cv2
-import ast
-import matplotlib.pyplot as plt
 
 from numba import jit
 from typing import List, Union, Tuple
 
 
-@jit(nopython=True)
+# @jit(nopython=True)
 def calculate_iou(gt, pr) -> float:
     """Calculates the Intersection over Union.
 
@@ -42,7 +37,7 @@ def calculate_iou(gt, pr) -> float:
 
     return overlap_area / union_area
 
-@jit(nopython=True)
+# @jit(nopython=True)
 def find_best_match(gts, pred, pred_idx, threshold = 0.5, ious=None) -> int:
     """Returns the index of the 'best match' between the
     ground-truth boxes and the prediction. The 'best match'
@@ -85,7 +80,7 @@ def find_best_match(gts, pred, pred_idx, threshold = 0.5, ious=None) -> int:
 
     return best_match_idx
 
-@jit(nopython=True)
+# @jit(nopython=True)
 def calculate_precision(gts, preds, threshold, ious) -> float:
     """Calculates precision for GT - prediction pairs at one threshold.
 
@@ -123,10 +118,16 @@ def calculate_precision(gts, preds, threshold, ious) -> float:
 
     # False negative: indicates a gt box had no associated predicted box.
     fn = (gts.sum(axis=1) > 0).sum()
-    return tp / (tp + fp + fn)
+
+    precision = tp / (tp + fp) if (tp + fp) != 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) != 0 else 0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) != 0 else 0
+    mAP = tp / (tp + fp + fn) if (tp + fp + fn) != 0 else 0
+
+    return precision, recall ,f1 , mAP
 
 
-@jit(nopython=True)
+# @jit(nopython=True)
 def calculate_image_precision(gts, preds, thresholds = (0.5, 0.55, 0.6, 0.65, 0.7, 0.75)) -> float:
     """Calculates image precision.
 
@@ -144,11 +145,21 @@ def calculate_image_precision(gts, preds, thresholds = (0.5, 0.55, 0.6, 0.65, 0.
     image_precision = 0.0
     
     ious = np.ones((len(gts), len(preds))) * -1
-    # ious = None
+
+    precision_ls = []
+    recall_ls = []
+    f1_ls = []
+    mAP_ls = []
 
     for threshold in thresholds:
-        precision_at_threshold = calculate_precision(gts.copy(), preds, threshold=threshold,
+        # precision_at_threshold = calculate_precision(gts.copy(), preds, threshold=threshold,
+        #                                              ious=ious)
+        # image_precision += precision_at_threshold / n_threshold
+        precision, recall ,f1 , mAP = calculate_precision(gts.copy(), preds, threshold=threshold,
                                                      ious=ious)
-        image_precision += precision_at_threshold / n_threshold
+        precision_ls.append(precision)
+        recall_ls.append(recall)
+        f1_ls.append(f1)
+        mAP_ls.append(mAP)
 
-    return image_precision
+    return np.mean(precision_ls), np.mean(recall_ls), np.mean(f1_ls), np.mean(mAP_ls)
